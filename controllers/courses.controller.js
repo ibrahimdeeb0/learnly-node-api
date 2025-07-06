@@ -4,65 +4,80 @@ const httpStatusText = require("../utils/httpStatusText");
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const appError = require("../utils/appError");
 
-const getAllCourses = asyncWrapper(async (request, response) => {
-  const query = request.query;
-  const limit = query.limit || 10; // get limit and if there is no value set value = 10
-  const page = query.page || 1;
+// GET /api/courses? page & limit & q(search) & category
+const getAllCourses = asyncWrapper(async (req, res) => {
+  const { page = 1, limit = 10, q, category } = req.query;
+  const filter = {};
+  if (q) filter.name = { $regex: q, $options: "i" };
+  if (category) filter.category = category;
+
   const skip = (page - 1) * limit;
-  // get all courses from mango db using Course Model
-  const courses = await CourseModel.find({}, { __v: false })
-    .limit(limit)
-    .skip(skip);
-  response.json({ status: httpStatusText.SUCCESS, data: { courses } });
-});
+  const courses = await CourseModel.find(filter)
+    .populate("teacher", "firstName lastName email")
+    .skip(skip)
+    .limit(Number(limit));
 
-const getCourse = asyncWrapper(async (request, response, next) => {
-  const courseId = request.params.courseId;
-  const course = await CourseModel.findById(courseId, { __v: false });
-  if (!course) {
-    const error = appError.create("course not found", 404, httpStatusText.FAIL);
-
-    return next(error);
-  }
-  return response.json({ status: httpStatusText.SUCCESS, data: { course } });
-});
-
-const createCourse = asyncWrapper(async (request, response) => {
-  const errors = validationResult(request);
-  // not empty
-  if (!errors.isEmpty()) {
-    const err = appError.create(errors.message, 400, httpStatusText.FAIL);
-    return next(err);
-  }
-
-  const newCourse = new CourseModel(request.body);
-  await newCourse.save();
-
-  response
-    .status(201)
-    .json({ status: httpStatusText.SUCCESS, data: { course: newCourse } });
-});
-
-const updateCourse = asyncWrapper(async (request, response) => {
-  const courseId = request.params.courseId;
-
-  const updatedCourse = await CourseModel.updateOne(
-    { _id: courseId },
-    {
-      $set: { ...request.body },
-    }
-  );
-  return response.status(200).json({
+  const total = await CourseModel.countDocuments(filter);
+  res.json({
     status: httpStatusText.SUCCESS,
-    data: { message: updatedCourse },
+    data: { total, page: Number(page), limit: Number(limit), courses },
   });
 });
 
-const deleteCourse = asyncWrapper(async (request, response) => {
-  const courseId = request.params.courseId;
+// GET /api/courses/:courseId
+const getCourse = asyncWrapper(async (req, res, next) => {
+  const course = await CourseModel.findById(req.params.courseId).populate(
+    "teacher",
+    "firstName lastName email"
+  );
+  if (!course) {
+    return next(appError.create("Course not found", 404, httpStatusText.FAIL));
+  }
+  res.json({ status: httpStatusText.SUCCESS, data: course });
+});
 
-  await CourseModel.deleteOne({ _id: courseId });
-  response.status(200).json({ status: httpStatusText.SUCCESS, data: {} });
+// POST /api/courses
+const createCourse = asyncWrapper(async (req, res) => {
+  // teacher من الـ JWT middleware
+  const teacherId = req.currentUser.id;
+  const { name, description, category, price, isPublished } = req.body;
+
+  const course = await CourseModel.create({
+    name,
+    description,
+    category,
+    price: Number(price),
+    isPublished: !!isPublished,
+    teacher: teacherId,
+  });
+
+  res.status(201).json({ status: httpStatusText.SUCCESS, data: course });
+});
+
+// PATCH /api/courses/:courseId
+const updateCourse = asyncWrapper(async (req, res, next) => {
+  const updates = { ...req.body };
+  // لا نسمح بتغيير المعلم بعد الإنشاء:
+  delete updates.teacher;
+
+  const course = await CourseModel.findByIdAndUpdate(
+    req.params.courseId,
+    updates,
+    { new: true, runValidators: true }
+  );
+  if (!course) {
+    return next(appError.create("Course not found", 404, httpStatusText.FAIL));
+  }
+  res.json({ status: httpStatusText.SUCCESS, data: course });
+});
+
+// DELETE /api/courses/:courseId
+const deleteCourse = asyncWrapper(async (req, res, next) => {
+  const course = await CourseModel.findByIdAndDelete(req.params.courseId);
+  if (!course) {
+    return next(appError.create("Course not found", 404, httpStatusText.FAIL));
+  }
+  res.json({ status: httpStatusText.SUCCESS, data: { id: course._id } });
 });
 
 module.exports = {
@@ -72,115 +87,3 @@ module.exports = {
   updateCourse,
   deleteCourse,
 };
-
-/* const createCourse = (request, response) => {
-  console.log(request.body);
-
-  const errors = validationResult(request);
-  console.log(errors);
-
-  // not empty
-  if (!errors.isEmpty()) {
-    return response.status(400).json(errors.array());
-  }
-
-  // if (!request.body.name) {
-  //    return response.status(400).json({ msg: "name not provided" });
- //   }
- //   if (!request.body.price) {
- //     return response.status(400).json({ msg: "price not provided" });
- //   } 
-
-  const course = { id: courses.length + 1, ...request.body };
-  courses.push(course);
-
-  response.status(201).json(course);
-};
-
-const createCourse = async (request, response) => {
-  console.log("request body -> \n", request.body);
-
-  const errors = validationResult(request);
-  console.log("errors request -> \n", errors);
-  // not empty
-  if (!errors.isEmpty()) {
-    return response.status(400).json(errors.array());
-  }
-
-  //   const course = { id: courses.length + 1, ...request.body };
-  //   courses.push(course);
-
-  //   response.status(201).json(course);
-
-  const newCourse = new CourseModel(request.body);
-  await newCourse.save();
-
-  response.status(201).json(newCourse);
-};
-
-const updateCourse = (request, response) => {
-  const courseId = +request.params.courseId;
-  let course = courses.find((course) => course.id === courseId);
-
-  if (!course) {
-    //? "return" used for stop execution code here
-    return response.status(404).json({ msg: "course not found" });
-  }
-
-  course = { ...course, ...request.body };
-
-  response.status(200).json(course);
-};
-
-const deleteCourse = (request, response) => {
-  const courseId = +request.params.courseId;
-  courses = courses.filter((course) => course.id !== courseId);
-
-  response.status(200).json({ msg: "success delete a course" });
-};
-
-const getCourse = async (request, response) => {
-  const courseId = request.params.courseId;
-  try {
-    const course = await CourseModel.findById(courseId);
-    if (!course) {
-      return response.status(404).json({
-        status: httpStatusText.FAIL,
-        data: { course: "course not found" },
-      });
-    }
-    return response.json({ status: httpStatusText.SUCCESS, data: { course } });
-  } catch (error) {
-    return response.status(400).json({
-      status: httpStatusText.ERROR,
-      data: null,
-      message: error.message,
-      status_code: 400,
-    });
-  }
-};
-
- */
-
-/* 
-async (request, response) => {
-  const courseId = request.params.courseId;
-  try {
-    const course = await CourseModel.findById(courseId);
-    if (!course) {
-      return response.status(404).json({
-        status: httpStatusText.FAIL,
-        data: { course: "course not found" },
-      });
-    }
-    return response.json({ status: httpStatusText.SUCCESS, data: { course } });
-  } catch (error) {
-    return response.status(400).json({
-      status: httpStatusText.ERROR,
-      data: null,
-      message: error.message,
-      status_code: 400,
-    });
-  }
-};
- */

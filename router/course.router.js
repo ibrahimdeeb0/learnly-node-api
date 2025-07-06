@@ -1,12 +1,11 @@
 const express = require("express");
-
 const router = express.Router();
 
+const verifyToken = require("../middlewares/verifyToken");
+const authorizeRoles = require("../middlewares/authorizeRoles");
+const userRoles = require("../utils/userRoles");
 const courseController = require("../controllers/courses.controller");
 const { validationSchema } = require("../middlewares/validationSchema");
-const verifyToken = require("../middlewares/verifyToken");
-const userRoles = require("../utils/userRoles");
-const authorizeRoles = require("../middlewares/authorizeRoles");
 
 router
   .route("/")
@@ -24,7 +23,7 @@ router
   .patch(
     verifyToken,
     authorizeRoles(userRoles.ADMIN, userRoles.TEACHER),
-    validationSchema(),
+    validationSchema(true),
     courseController.updateCourse
   )
   .delete(

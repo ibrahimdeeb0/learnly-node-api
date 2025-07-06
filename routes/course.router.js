@@ -6,7 +6,7 @@ const authorizeRoles = require("../middlewares/authorizeRoles");
 const userRoles = require("../utils/userRoles");
 const courseController = require("../controllers/courses.controller");
 const { validationSchema } = require("../middlewares/validationSchema");
-
+ 
 router
   .route("/")
   .get(verifyToken, courseController.getAllCourses)
@@ -30,6 +30,14 @@ router
     verifyToken,
     authorizeRoles(userRoles.ADMIN, userRoles.TEACHER),
     courseController.deleteCourse
+  );
+
+router
+  .route("/:courseId/enroll")
+  .post(
+    verifyToken,
+    authorizeRoles(userRoles.STUDENT),
+    courseController.enrollInCourse
   );
 
 module.exports = router;

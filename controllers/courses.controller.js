@@ -3,6 +3,7 @@ const CourseModel = require("../models/course.model");
 const httpStatusText = require("../utils/httpStatusText");
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const appError = require("../utils/appError");
+const UserModel = require("../models/user.model");
 
 // GET /api/courses? page & limit & q(search) & category
 const getAllCourses = asyncWrapper(async (req, res) => {
@@ -80,10 +81,55 @@ const deleteCourse = asyncWrapper(async (req, res, next) => {
   res.json({ status: httpStatusText.SUCCESS, data: { id: course._id } });
 });
 
+// POST /api/courses/:courseId/enroll
+const enrollInCourse = asyncWrapper(async (req, res, next) => {
+  const userId = req.currentUser.id;
+  const courseId = req.params.courseId;
+
+  const course = await CourseModel.findById(courseId);
+  if (!course) {
+    return next(appError.create("Course not found", 404, httpStatusText.FAIL));
+  }
+
+  const user = await UserModel.findById(userId);
+  if (user.enrolledCourses.includes(courseId)) {
+    return next(appError.create("Already enrolled", 400, httpStatusText.FAIL));
+  }
+
+  user.enrolledCourses.push(courseId);
+  await user.save();
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: { message: "Enrolled successfully", courseId },
+  });
+});
+
+// GET /api/courses/my-courses
+const getMyCourses = asyncWrapper(async (req, res) => {
+  const user = await UserModel.findById(req.currentUser.id).populate({
+    path: "enrolledCourses",
+    select: "name description price isPublished teacher",
+    populate: { path: "teacher", select: "firstName lastName email" },
+  });
+  if (!user) {
+    return res.status(404).json({
+      status: httpStatusText.FAIL,
+      message: "User not found",
+    });
+  }
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: { courses: user.enrolledCourses || [] },
+  });
+});
+
 module.exports = {
   getAllCourses,
   getCourse,
   createCourse,
   updateCourse,
   deleteCourse,
+  enrollInCourse,
+  getMyCourses,
 };

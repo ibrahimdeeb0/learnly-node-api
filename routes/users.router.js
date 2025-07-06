@@ -32,14 +32,29 @@ const upload = multer({ storage: diskStorage, fileFilter: fileFilter });
 const userController = require("../controllers/users.controller");
 const verifyToken = require("../middlewares/verifyToken");
 const authorizeRoles = require("../middlewares/authorizeRoles");
-const userRole = require("../utils/userRoles");
+const userRoles = require("../utils/userRoles");
+const courseController = require("../controllers/courses.controller");
 
 router
   .route("/")
-  .get(verifyToken, authorizeRoles(userRole.ADMIN), userController.getAllUsers);
+  .get(
+    verifyToken,
+    authorizeRoles(userRoles.ADMIN),
+    userController.getAllUsers
+  );
+
 router
   .route("/register")
   .post(upload.single("avatar"), userController.register);
+
 router.route("/login").post(userController.login);
+
+router
+  .route("/myCourses/courses")
+  .get(
+    verifyToken,
+    authorizeRoles(userRoles.STUDENT),
+    courseController.getMyCourses
+  );
 
 module.exports = router;

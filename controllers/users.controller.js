@@ -4,6 +4,7 @@ const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
 const bcryptjs = require("bcryptjs");
 const generateJWT = require("../utils/generateJWT");
+const userRoles = require("../utils/userRoles");
 
 const getAllUsers = asyncWrapper(async (request, response) => {
   const query = request.query;
@@ -19,7 +20,7 @@ const getAllUsers = asyncWrapper(async (request, response) => {
 
 const register = asyncWrapper(async (request, response, next) => {
   //   console.log(request.body);
-  const { firstName, lastName, email, password, role } = request.body;
+  const { firstName, lastName, email, password } = request.body;
 
   const oldUser = await UserModel.findOne({ email: email });
   if (oldUser) {
@@ -33,13 +34,14 @@ const register = asyncWrapper(async (request, response, next) => {
 
   // password hashing
   const hashedPassword = await bcryptjs.hash(password, 10);
+  const userRole = userRoles.STUDENT;
 
   const newUser = new UserModel({
     firstName,
     lastName,
     email,
     password: hashedPassword,
-    role,
+    role: userRole,
     avatar: request.file ? request.file.path : "uploads/profile_img.png",
   });
 
@@ -53,9 +55,15 @@ const register = asyncWrapper(async (request, response, next) => {
 
   await newUser.save();
 
-  response
-    .status(201)
-    .json({ status: httpStatusText.SUCCESS, data: { newUser } });
+  response.status(201).json({
+    status: httpStatusText.SUCCESS,
+    data: {
+      id: newUser._id,
+      email: newUser.email,
+      role: newUser.role,
+      token,
+    },
+  });
 });
 
 const login = asyncWrapper(async (request, response, next) => {
@@ -71,12 +79,12 @@ const login = asyncWrapper(async (request, response, next) => {
     return next(err);
   }
 
-  const user = await UserModel.findOne({ email: email });
-  // console.log("found user:", user);
+  const user = await UserModel.findOne({ email: email }).select(
+    "+password role"
+  );
 
   if (!user) {
-    console.log("No user found with email:", email);
-    const err = appError.create("user not found", 400, httpStatusText.FAIL);
+    const err = appError.create("user not found", 404, httpStatusText.FAIL);
     return next(err);
   }
 
@@ -86,7 +94,7 @@ const login = asyncWrapper(async (request, response, next) => {
 
   if (user && matchedPassword) {
     // generating JWT token
-    const token = await generateJWT({
+    const token = generateJWT({
       email: user.email,
       id: user._id,
       role: user.role,
@@ -99,20 +107,50 @@ const login = asyncWrapper(async (request, response, next) => {
         email: user.email,
         token: token,
         role: user.role,
+        avatar: user.avatar,
       },
     });
   } else {
     const err = appError.create(
       "email or password was wrong",
-      500,
+      401,
       httpStatusText.FAIL
     );
     return next(err);
   }
 });
 
+const changeUserRole = asyncWrapper(async (request, response, next) => {
+  const { role } = request.body;
+
+  // Validate the role
+  if (!Object.values(userRoles).includes(role)) {
+    return next(appError.create("Invalid role", 400, httpStatusText.FAIL));
+  }
+
+  //  Search for the user
+  const user = await UserModel.findById(request.params.id);
+  if (!user) {
+    return next(appError.create("User not found", 404, httpStatusText.FAIL));
+  }
+
+  // Update the role
+  user.role = role;
+  await user.save();
+
+  response.json({
+    status: httpStatusText.SUCCESS,
+    data: {
+      id: user._id,
+      email: user.email,
+      role: user.role,
+    },
+  });
+});
+
 module.exports = {
   getAllUsers,
   register,
   login,
+  changeUserRole,
 };

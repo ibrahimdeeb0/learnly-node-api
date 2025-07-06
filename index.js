@@ -5,7 +5,7 @@ const path = require("path");
 const app = express();
 
 // for serving static files like images, css, js, etc.
-app.use('/uploads',express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // const port = 5004;
 
 const cors = require("cors");
@@ -17,6 +17,8 @@ const httpStatusText = require("./utils/httpStatusText");
 const coursesRouter = require("./router/course.router");
 
 const usersRouter = require("./router/users.router");
+
+const rolesRouter = require("./router/roles.router");
 
 const mongo_url = process.env.MONGO_URL;
 const port = process.env.PORT;
@@ -31,8 +33,10 @@ mongoose
 // reading response body as a JSON
 app.use(cors());
 app.use(express.json());
+
 app.use("/api/courses", coursesRouter);
 app.use("/api/users", usersRouter);
+app.use("/api/users", rolesRouter);
 
 // global middlewares for not fount routes
 app.use((req, res, next) => {

@@ -31,8 +31,12 @@ const upload = multer({ storage: diskStorage, fileFilter: fileFilter });
 
 const userController = require("../controllers/users.controller");
 const verifyToken = require("../middlewares/verifyToken");
+const authorizeRoles = require("../middlewares/authorizeRoles");
+const userRole = require("../utils/userRoles");
 
-router.route("/").get(verifyToken, userController.getAllUsers);
+router
+  .route("/")
+  .get(verifyToken, authorizeRoles(userRole.ADMIN), userController.getAllUsers);
 router
   .route("/register")
   .post(upload.single("avatar"), userController.register);

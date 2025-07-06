@@ -1,7 +1,7 @@
 const userRoles = {
   ADMIN: "ADMIN",
-  USER: "USER",
-  MANGER: "MANGER",
+  TEACHER: "TEACHER",
+  STUDENT: "STUDENT",
 };
 
 module.exports = userRoles;

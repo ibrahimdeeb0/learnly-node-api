@@ -6,20 +6,30 @@ const courseController = require("../controllers/courses.controller");
 const { validationSchema } = require("../middlewares/validationSchema");
 const verifyToken = require("../middlewares/verifyToken");
 const userRoles = require("../utils/userRoles");
-const allowedTo = require("../middlewares/allowedTo");
+const authorizeRoles = require("../middlewares/authorizeRoles");
 
 router
   .route("/")
-  .get(courseController.getAllCourses)
-  .post(validationSchema(), courseController.createCourse);
+  .get(verifyToken, courseController.getAllCourses)
+  .post(
+    verifyToken,
+    authorizeRoles(userRoles.ADMIN, userRoles.TEACHER),
+    validationSchema(),
+    courseController.createCourse
+  );
 
 router
   .route("/:courseId")
   .get(courseController.getCourse)
-  .patch(courseController.updateCourse)
+  .patch(
+    verifyToken,
+    authorizeRoles(userRoles.ADMIN, userRoles.TEACHER),
+    validationSchema(),
+    courseController.updateCourse
+  )
   .delete(
     verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.MANAGER),
+    authorizeRoles(userRoles.ADMIN, userRoles.TEACHER),
     courseController.deleteCourse
   );
 

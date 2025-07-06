@@ -15,8 +15,13 @@ const verifyToken = (request, response, next) => {
 
   try {
     const currentUser = jwt.verify(token, process.env.JWT_SECRET_KEY);
-    console.log("current User. ", currentUser);
-    request.currentUser = currentUser;
+    // console.log("current User. ", currentUser);
+    request.currentUser = {
+      id: currentUser.id,
+      role: currentUser.role,
+      email: currentUser.email,
+      avatar: currentUser.avatar || null,
+    };
     next();
   } catch (err) {
     const error = appError.create("invalid token", 401, httpStatusText.ERROR);

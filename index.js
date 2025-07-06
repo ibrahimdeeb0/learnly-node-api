@@ -22,6 +22,8 @@ const rolesRouter = require("./routes/roles.router");
 
 const contentRouter = require("./routes/content.router");
 
+const reviewRouter = require("./routes/review.router");
+
 const mongo_url = process.env.MONGO_URL;
 const port = process.env.PORT;
 
@@ -40,6 +42,7 @@ app.use("/api/courses", coursesRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/users", rolesRouter);
 app.use("/api/courses/:courseId/contents", contentRouter);
+app.use("/api/courses/:courseId", reviewRouter);
 
 // global middlewares for not fount routes
 app.use((req, res, next) => {

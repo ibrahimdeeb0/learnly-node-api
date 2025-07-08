@@ -7,10 +7,22 @@ const UserModel = require("../models/user.model");
 
 // GET /api/courses? page & limit & q(search) & category
 const getAllCourses = asyncWrapper(async (req, res) => {
-  const { page = 1, limit = 10, q, category } = req.query;
+  const {
+    page = 1,
+    limit = 10,
+    q,
+    category,
+    priceMin,
+    priceMax,
+    teacher,
+  } = req.query;
   const filter = {};
+
   if (q) filter.name = { $regex: q, $options: "i" };
   if (category) filter.category = category;
+  if (teacher) filter.teacher = teacher; // teacherId
+  if (priceMin) filter.price = { ...filter.price, $gte: Number(priceMin) };
+  if (priceMax) filter.price = { ...filter.price, $lte: Number(priceMax) };
 
   const skip = (page - 1) * limit;
   const courses = await CourseModel.find(filter)
